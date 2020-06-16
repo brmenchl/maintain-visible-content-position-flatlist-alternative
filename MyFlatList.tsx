@@ -108,35 +108,19 @@ export class MyFlatList<ItemT> extends React.PureComponent<
 > {
   static defaultProps: DefaultProps = defaultProps;
 
-  /**
-   * Scrolls to the item at the specified index such that it is positioned in the viewable area
-   * such that `viewPosition` 0 places it at the top, 1 at the bottom, and 0.5 centered in the
-   * middle. `viewOffset` is a fixed number of pixels to offset the final target position.
-   * Note: cannot scroll to locations outside the render window without specifying the
-   * `getItemLayout` prop.
-   */
-  scrollToIndex(params: {
-    animated?: boolean;
-    index: number;
-    viewOffset?: number;
-    viewPosition?: number;
-  }) {
-    if (this.listRef.current) {
-      this.listRef.current.scrollToIndex(params);
-    }
-  }
-
-  /**
-   * Scroll to a specific content pixel offset in the list.
-   *
-   * Check out [scrollToOffset](docs/virtualizedlist.html#scrolltooffset) of VirtualizedList
-   */
-  scrollToOffset(params: { animated?: boolean; offset: number }) {
-    if (this.listRef.current) {
-      this.listRef.current.scrollToOffset(params);
-      this.listRef.current.context;
-    }
-  }
+  private firstKeyViewability: ViewabilityConfigCallbackPair = {
+    viewabilityConfig: {
+      itemVisiblePercentThreshold: 20,
+    },
+    onViewableItemsChanged: ({ viewableItems }) =>
+      (this.firstKey = viewableItems.length ? viewableItems[0].key : undefined),
+  };
+  private listRef = React.createRef<VirtualizedList<ItemT>>();
+  private virtualizedListPairs: Array<ViewabilityConfigCallbackPair> = [];
+  private shouldMaintainVisibleScrollPositionOnNextUpdate: boolean = false;
+  private firstKey: string | undefined;
+  private canCallOnBeginningReached: boolean = false;
+  private canCallOnEndReached: boolean = false;
 
   constructor(props: MyFlatListProps<ItemT>) {
     super(props);
@@ -162,6 +146,40 @@ export class MyFlatList<ItemT> extends React.PureComponent<
     this.virtualizedListPairs.push(this.firstKeyViewability);
   }
 
+  public maintainVisibleScrollPositionOnNextUpdate(value: boolean) {
+    this.shouldMaintainVisibleScrollPositionOnNextUpdate = value;
+  }
+
+  /**
+   * Scrolls to the item at the specified index such that it is positioned in the viewable area
+   * such that `viewPosition` 0 places it at the top, 1 at the bottom, and 0.5 centered in the
+   * middle. `viewOffset` is a fixed number of pixels to offset the final target position.
+   * Note: cannot scroll to locations outside the render window without specifying the
+   * `getItemLayout` prop.
+   */
+  public scrollToIndex(params: {
+    animated?: boolean;
+    index: number;
+    viewOffset?: number;
+    viewPosition?: number;
+  }) {
+    if (this.listRef.current) {
+      this.listRef.current.scrollToIndex(params);
+    }
+  }
+
+  /**
+   * Scroll to a specific content pixel offset in the list.
+   *
+   * Check out [scrollToOffset](docs/virtualizedlist.html#scrolltooffset) of VirtualizedList
+   */
+  public scrollToOffset(params: { animated?: boolean; offset: number }) {
+    if (this.listRef.current) {
+      this.listRef.current.scrollToOffset(params);
+      this.listRef.current.context;
+    }
+  }
+
   private cleanUpViewabilityConfigProps = (
     viewabilityConfigCallbackAsPairs: ViewabilityConfigCallbackPairs
   ) => {
@@ -178,17 +196,54 @@ export class MyFlatList<ItemT> extends React.PureComponent<
     }));
   };
 
-  private firstKeyViewability: ViewabilityConfigCallbackPair = {
-    viewabilityConfig: {
-      itemVisiblePercentThreshold: 20,
-    },
-    onViewableItemsChanged: ({ viewableItems }) =>
-      (this.firstKey = viewableItems.length ? viewableItems[0].key : undefined),
-  };
-  private listRef = React.createRef<VirtualizedList<ItemT>>();
-  private virtualizedListPairs: Array<ViewabilityConfigCallbackPair> = [];
-  private shouldMaintainVisibleScrollPositionOnNextUpdate: boolean = false;
-  private firstKey: string | undefined;
+  public componentDidUpdate(prevProps: MyFlatListProps<ItemT>) {
+    // If previously set flag to maintain scroll position, and data has just changed
+    if (
+      this.shouldMaintainVisibleScrollPositionOnNextUpdate &&
+      this.props.data !== prevProps.data
+    ) {
+      // TODO: entirely offset-based approach, using snapshotBeforeUpdate
+      // Also could use onViewableItemsChanged to get firstKey, onSnapshot look up cell offset, didUpdate, look up cell offset, scroll difference
+      if (this.firstKey) {
+        // Find the previous first visible item key, and scroll to the item with that key
+        const updatedIndex = this.props.data?.findIndex(
+          (row, index) => this.props.keyExtractor(row, index) === this.firstKey
+        );
+        if (updatedIndex !== undefined && updatedIndex > -1) {
+          this.scrollToIndex({
+            index: updatedIndex,
+            animated: false,
+          });
+        }
+      }
+      this.shouldMaintainVisibleScrollPositionOnNextUpdate = false;
+    }
+  }
+
+  public render() {
+    // Override VirtualizedList onEndReached functionality
+    const {
+      onEndReached,
+      onEndReachedThreshold,
+      viewabilityConfig,
+      onViewableItemsChanged,
+      ...props
+    } = this.props;
+    return (
+      <VirtualizedList
+        {...props}
+        onContentSizeChange={this.onContentSizeChange}
+        onLayout={this.onLayout}
+        onScroll={this.onScroll}
+        getItem={this.getItem}
+        getItemCount={this.getItemCount}
+        keyExtractor={this.props.keyExtractor}
+        ref={this.listRef}
+        viewabilityConfigCallbackPairs={this.virtualizedListPairs}
+        renderItem={this.props.renderItem}
+      />
+    );
+  }
 
   private getItem = (data: ItemT[], index: number) => {
     return data[index];
@@ -214,7 +269,6 @@ export class MyFlatList<ItemT> extends React.PureComponent<
     this.props.onScroll?.(e);
   };
 
-  private canCallOnBeginningReached: boolean = false;
   private maybeCallOnBeginningReached = () => {
     const { onBeginningReached, onBeginningReachedThreshold } = this.props;
     const { offset, visibleLength, contentLength } = this.getScrollMetrics()!;
@@ -238,7 +292,6 @@ export class MyFlatList<ItemT> extends React.PureComponent<
     }
   };
 
-  private canCallOnEndReached: boolean = false;
   private maybeCallOnEndReached = () => {
     const { onEndReached, onEndReachedThreshold } = this.props;
     const { offset, visibleLength, contentLength } = this.getScrollMetrics()!;
@@ -249,11 +302,7 @@ export class MyFlatList<ItemT> extends React.PureComponent<
     const threshold = onEndReachedThreshold
       ? onEndReachedThreshold * visibleLength
       : 0;
-    if (
-      threshold &&
-      distanceFromEnd < threshold &&
-      this.canCallOnEndReached
-    ) {
+    if (threshold && distanceFromEnd < threshold && this.canCallOnEndReached) {
       this.canCallOnEndReached = false;
       onEndReached({ distanceFromEnd });
     } else if (distanceFromEnd > threshold) {
@@ -268,57 +317,4 @@ export class MyFlatList<ItemT> extends React.PureComponent<
       ?.getChildContext()
       .virtualizedList.getScrollMetrics();
   };
-
-  public maintainVisibleScrollPositionOnNextUpdate(value: boolean) {
-    this.shouldMaintainVisibleScrollPositionOnNextUpdate = value;
-  }
-
-  componentDidUpdate(prevProps: MyFlatListProps<ItemT>) {
-    // If previously set flag to maintain scroll position, and data has just changed
-    if (
-      this.shouldMaintainVisibleScrollPositionOnNextUpdate &&
-      this.props.data !== prevProps.data
-    ) {
-      // TODO: entirely offset-based approach, using snapshotBeforeUpdate
-      // Also could use onViewableItemsChanged to get firstKey, onSnapshot look up cell offset, didUpdate, look up cell offset, scroll difference
-      if (this.firstKey) {
-        // Find the previous first visible item key, and scroll to the item with that key
-        const updatedIndex = this.props.data?.findIndex(
-          (row, index) => this.props.keyExtractor(row, index) === this.firstKey
-        );
-        if (updatedIndex !== undefined && updatedIndex > -1) {
-          this.scrollToIndex({
-            index: updatedIndex,
-            animated: false,
-          });
-        }
-      }
-      this.shouldMaintainVisibleScrollPositionOnNextUpdate = false;
-    }
-  }
-
-  render() {
-    // Override VirtualizedList onEndReached functionality
-    const {
-      onEndReached,
-      onEndReachedThreshold,
-      viewabilityConfig,
-      onViewableItemsChanged,
-      ...props
-    } = this.props;
-    return (
-      <VirtualizedList
-        {...props}
-        onContentSizeChange={this.onContentSizeChange}
-        onLayout={this.onLayout}
-        onScroll={this.onScroll}
-        getItem={this.getItem}
-        getItemCount={this.getItemCount}
-        keyExtractor={this.props.keyExtractor}
-        ref={this.listRef}
-        viewabilityConfigCallbackPairs={this.virtualizedListPairs}
-        renderItem={this.props.renderItem}
-      />
-    );
-  }
 }
