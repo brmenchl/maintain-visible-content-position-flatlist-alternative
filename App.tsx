@@ -10,7 +10,8 @@ import { useGenerateData } from "./generateData";
 import { Data } from "./models";
 import { MyFlatList } from "./MyFlatList";
 
-const keyExtractor = (item: Data) => item.workoutId;
+const keyExtractor = (item: Data) => item.id;
+const scrollKeyExtractor = (item: Data) => item.rank;
 
 const NORMAL_ROW_HEIGHT = 100;
 const CURRENT_USER_ROW_HEIGHT = 110;
@@ -39,7 +40,8 @@ export default function App() {
           <ActivityIndicator />
         </View>
       );
-    } else return null;
+    } else {
+    }
   }, [isLoadingPrevPage]);
 
   const renderBottomSpinnerWindow = useCallback(() => {
@@ -49,7 +51,8 @@ export default function App() {
           <ActivityIndicator />
         </View>
       );
-    } else return null;
+    } else {
+    }
   }, [isLoadingNextPage]);
 
   const handleFetchPrevious = useCallback(() => {
@@ -89,6 +92,7 @@ export default function App() {
           renderItem={renderRow}
           removeClippedSubviews={true}
           keyExtractor={keyExtractor}
+          scrollKeyExtractor={scrollKeyExtractor}
           getItemLayout={getItemLayout}
           ListFooterComponent={renderBottomSpinnerWindow}
           ListHeaderComponent={renderTopSpinnerWindow}
@@ -111,7 +115,6 @@ const renderRow: ListRenderItem<Data> = (info) =>
   );
 
 const Row: React.FC<Data> = React.memo((props) => {
-  // console.log(`R - ${props.workoutId}`);
   return (
     <View style={styles.row}>
       <View style={styles.rank}>
@@ -125,7 +128,6 @@ const Row: React.FC<Data> = React.memo((props) => {
 });
 
 const CurrentUserRow: React.FC<Data> = React.memo((props) => {
-  // console.log(`R - ${props.workoutId}`);
   return (
     <View style={styles.currentUserRow}>
       <View style={styles.rank}>

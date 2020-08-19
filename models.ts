@@ -1,15 +1,15 @@
 export type Data = {
-  workoutId: string;
+  id: string;
   rank: number;
-  totalWork: number;
+  otherData: number;
   username: string;
   isCurrentUser: boolean;
 };
 
-export const toRandomRankData = (idx: number): Data => ({
-  workoutId: `workout-id-${idx}`,
+export const toRandomData = (idx: number): Data => ({
+  id: `id-${idx}`,
   rank: idx,
-  totalWork: Math.round(idx * 10 + Math.random() * 10),
+  otherData: Math.round(idx * 10 + Math.random() * 10),
   username: `person-${idx}`,
   isCurrentUser: false,
 });

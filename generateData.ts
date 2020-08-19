@@ -1,16 +1,21 @@
 import { useInterval } from "./useInterval";
 import { useCallback, useReducer } from "react";
 import { times, slice } from "ramda";
-import { toRandomRankData, Data } from "./models";
+import { toRandomData, Data } from "./models";
+
+/**
+ * This is a really bad generator
+ * but it works
+ */
 
 const FETCH_INTERVAL = 3500;
 
 const startTime = new Date();
 
-const fullClassData =  times((idx) => toRandomRankData(idx), 1000);
+const fullListData = times((idx) => toRandomData(idx), 1000);
 
 const windowD = (offset: number) => {
-  const { data, currentUserIndex } = swapOnTimer(fullClassData);
+  const { data, currentUserIndex } = swapOnTimer(fullListData);
   return {
     data: slice(offset - 50, offset + 51, data),
     currentUserIndex,
@@ -60,7 +65,7 @@ type A = ReturnType<
 function reducer(state: State, action: A): State {
   switch (action.type) {
     case "fetch next page":
-      console.log(state.offset.isLoadingNext)
+      console.log(state.offset.isLoadingNext);
       if (state.offset.isLoadingNext) {
         return state;
       }
@@ -161,15 +166,15 @@ export const useGenerateData = (size: number) => {
 const notCurrentUser: Data = {
   username: "frank",
   rank: 3,
-  totalWork: 100,
-  workoutId: "FRANK",
+  otherData: 100,
+  id: "FRANK",
   isCurrentUser: false,
 };
 const currentUser: Data = {
   username: "ME!",
   rank: 4,
-  totalWork: 100,
-  workoutId: "ME",
+  otherData: 100,
+  id: "ME",
   isCurrentUser: true,
 };
 

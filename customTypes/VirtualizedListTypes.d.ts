@@ -1,3 +1,4 @@
+import * as React from "react";
 import "react-native";
 declare module "react-native" {
   // Added to an upcoming type release, this was missing before https://github.com/DefinitelyTyped/DefinitelyTyped/pull/44462/files
